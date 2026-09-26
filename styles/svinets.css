@@ -1,0 +1,21 @@
+.svinets-generator {
+  min-width: 430px;
+  max-width: 560px;
+}
+
+.svinets-section {
+  margin: 0 0 14px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+}
+
+.svinets-hint {
+  margin: 3px 0 6px;
+  color: #777;
+  font-size: 0.88em;
+  line-height: 1.25;
+}
+
+.svinets-card {
+  margin: 0;
+}

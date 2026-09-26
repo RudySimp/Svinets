@@ -1,0 +1,17 @@
+{
+  "SVINETS.Title": "Генератор лута",
+  "SVINETS.Generate": "Сгенерировать",
+  "SVINETS.SaveSettings": "Сохранить настройки",
+  "SVINETS.Cancel": "Отмена",
+  "SVINETS.PlaceSection": "1. Где найден лут",
+  "SVINETS.TypeSection": "2. Что это за лут",
+  "SVINETS.BudgetSection": "3. Сколько это стоит",
+  "SVINETS.PartySection": "4. Партия",
+  "SVINETS.MagicSection": "5. Магия",
+  "SVINETS.CompositionSection": "6. Состав лута",
+  "SVINETS.LimitsSection": "7. Ограничения",
+  "SVINETS.ExtraSection": "8. Дополнительно",
+  "SVINETS.SceneControl": "Svinets | Генератор лута",
+  "SVINETS.NotGM": "Генератор лута доступен только Мастеру.",
+  "SVINETS.ModuleLoaded": "Svinets | Module loaded"
+}
