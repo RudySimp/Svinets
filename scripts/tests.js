@@ -1,50 +1,48 @@
-import {
-  SETTINGS,
-  CONTEXTS,
-  LOOT_TYPE_PROFILES,
-  PARTY_LEVEL_PROFILES
-} from "./data.js";
-import { generateLoot, validateData } from "./generator.js";
-import { gpToCp, rarityRank } from "./utils.js";
+import { CONTEXTS, SETTINGS, RICHNESS_PROFILES } from "./data.js";
+import { generateLoot, parseLootTable, regenerateUnlocked, replaceLootLine, validateData } from "./generator.js";
 import { DEFAULT_OPTIONS } from "./settings.js";
-  // -------------------- 16. SMOKE-ТЕСТЫ --------------------
+import { SVINETS_ASSETS } from "./assets.js";
+import { buildDialogContent, buildPreviewContent } from "./app.js";
+import { renderLootChat, foundryItemData } from "./export.js";
 
-  function stableResultSignature(result) {
-    return JSON.stringify({ lines:result.lines.map(l=>[l.name,l.qty,l.totalCp,l.rarity]), coinsCp:result.coinsCp, flavor:result.flavor?.name??null });
-  }
+function stableResultSignature(result) {
+  return JSON.stringify({ lines: result.lines.map(line => [line.name, line.qty, line.totalCp, line.rarity, line.sourceValueClass]), coinsCp: result.coinsCp, flavors: result.flavors?.map(flavor => flavor.name) ?? [] });
+}
 
-  function runSmokeTests(entries) {
-    const tests=[];
-    const check=(name,fn)=>{ try{tests.push({test:name,ok:Boolean(fn()),error:''});}catch(error){tests.push({test:name,ok:false,error:error.message});} };
-    check('Валидация данных: 1329 raw rows',()=>{ const v=validateData(entries); return v.rawRows===1329; });
-    check('Инвариант бюджета: 100 комбинаций',()=>{
-      const contexts=Object.keys(CONTEXTS), types=Object.keys(LOOT_TYPE_PROFILES), levels=Object.keys(PARTY_LEVEL_PROFILES), budgets=[0.01,1,10,100,500,1000,5000,50000,250000];
-      for(let i=0;i<100;i++){
-        const r=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:contexts[i%contexts.length],lootType:types[i%types.length],partyLevel:levels[i%levels.length],budgetGp:budgets[i%budgets.length],seed:10000+i,includeFlavor:false});
-        if(r.itemsCp+r.coinsCp!==r.budgetCp) return false;
-      }
-      return true;
-    });
-    check('Редкость 1–4 ≤ uncommon',()=>{ const r=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'36K',lootType:'hoard',partyLevel:'1-4',budgetGp:50000,maxRarity:'any',allowLegendary:true,maxMagicItems:5,seed:12345,includeFlavor:false}); return r.lines.filter(l=>l.magic&&l.rarity).every(l=>rarityRank(l.rarity)<=rarityRank('uncommon')); });
-    check('Attunement partySize=1 ≤ 3',()=>{ const r=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'14K',lootType:'hoard',partyLevel:'17-20',budgetGp:100000,maxRarity:'veryRare',maxMagicItems:5,partySize:1,seed:12345,includeFlavor:false}); return r.attunementCount<=3; });
-    check('Seed 12345 воспроизводим',()=>{ const a=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'36K',budgetGp:10000,seed:12345,includeFlavor:false}); const b=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'36K',budgetGp:10000,seed:12345,includeFlavor:false}); return stableResultSignature(a)===stableResultSignature(b); });
-    check('budget=1e12 clamp',()=>generateLoot(entries,{...DEFAULT_OPTIONS,budgetGp:1e12,lootType:'trade',seed:1}).budgetCp===gpToCp(SETTINGS.maxBudgetGp));
-    check('budget=0 throws',()=>{try{generateLoot(entries,{...DEFAULT_OPTIONS,budgetGp:0});return false;}catch{return true;}});
-    check('v5 hoard 20k: 12–17 строк, 40–70 единиц, монеты 10–35%',()=>{
-      const r=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'36K',lootType:'hoard',partyLevel:'any',budgetGp:20000,seed:52001,includeFlavor:false});
-      return r.lines.length>=12&&r.lines.length<=17&&r.lines.reduce((n,l)=>n+l.qty,0)>=40&&r.lines.reduce((n,l)=>n+l.qty,0)<=70&&r.actualCoinShare>=0.10&&r.actualCoinShare<=0.35;
-    });
-    check('v5 hoard 100k: 18–24 строк, 80–150 единиц',()=>{
-      const r=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'36K',lootType:'hoard',partyLevel:'any',budgetGp:100000,seed:52002,includeFlavor:false});
-      const units=r.lines.reduce((n,l)=>n+l.qty,0);
-      return r.lines.length>=18&&r.lines.length<=24&&units>=80&&units<=150;
-    });
-    check('v5 hoard 1m: 22–30 строк, 150–400 единиц',()=>{
-      const r=generateLoot(entries,{...DEFAULT_OPTIONS,contextId:'36K',lootType:'hoard',partyLevel:'any',budgetGp:1000000,seed:52003,includeFlavor:false});
-      const units=r.lines.reduce((n,l)=>n+l.qty,0);
-      return r.lines.length>=22&&r.lines.length<=30&&units>=150&&units<=400;
-    });
-    console.group('Svinets | Smoke tests'); console.table(tests); const failed=tests.filter(t=>!t.ok); if(failed.length) console.error('Проваленные тесты:',failed); else console.info(`Все smoke-тесты пройдены: ${tests.length}.`); console.groupEnd();
-    return tests;
-  }
+function baseOptions(overrides = {}) { return { ...DEFAULT_OPTIONS, contextId: "50K", budgetGp: 500, magicMode: "automatic", seed: 12345, ...overrides }; }
+
+function runSmokeTests(entries) {
+  const tests = [];
+  const check = (test, fn) => { try { tests.push({ test, ok: Boolean(fn()), error: "" }); } catch (error) { tests.push({ test, ok: false, error: error.message }); } };
+  check("Валидация данных: 1329 raw rows", () => validateData(entries).rawRows === 1329);
+  check("Exact budget: 100 deterministic combinations", () => { const ids = Object.keys(CONTEXTS); const budgets = [1, 50, 500, 5_000, 50_000, 100_000]; for (let index = 0; index < 100; index += 1) { const result = generateLoot(entries, baseOptions({ contextId: ids[index % ids.length], budgetGp: budgets[index % budgets.length], seed: 20_000 + index })); if (result.itemsCp + result.coinsCp !== result.budgetCp) return false; } return true; });
+  check("Большой treasure не превращается систематически в 80–95% монет", () => { const values = [1, 2, 3, 4, 5, 6, 7, 8].map(seed => generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed }))).map(result => result.actualCoinShare); return values.every(share => share < 0.80) && values.reduce((sum, value) => sum + value, 0) / values.length < 0.55; });
+  check("Large-budget coin-share statistics stay healthy", () => { for (const [contextId, budgetGp] of [["35K", 50_000], ["36K", 50_000], ["39K", 50_000], ["72K", 100_000]]) { const values = Array.from({ length: 50 }, (_unused, index) => generateLoot(entries, baseOptions({ contextId, budgetGp, seed: 40_000 + index, includeFlavor: false }))); const shares = values.map(result => result.actualCoinShare).sort((a, b) => a - b); const median = (shares[24] + shares[25]) / 2; const average = shares.reduce((sum, value) => sum + value, 0) / shares.length; const inside = values.filter(result => result.coinRangeSatisfied).length; if (median >= 0.75 || average >= 0.65 || inside < 25) return false; } return true; });
+  check("Poor context предупреждает, но генерирует", () => { const result = generateLoot(entries, baseOptions({ contextId: "1K", budgetGp: 50_000, seed: 30_001 })); return result.itemsCp + result.coinsCp === result.budgetCp && result.contextRichness.richness === "poor"; });
+  check("Spyglass remains single policy", () => { for (let seed = 1; seed <= 8; seed += 1) { const result = generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed })); if (result.lines.some(line => /подзорн/i.test(line.name) && line.qty > 1)) return false; } return true; });
+  check("Mundane focus never receives magic-item naming", () => { const result = generateLoot(entries, baseOptions({ contextId: "64K", budgetGp: 5_000, magicMode: "none", seed: 30_002 })); return result.lines.filter(line => line.category === "focus").every(line => !/магическ/i.test(line.name)); });
+  check("Generic magic uses abstract names", () => { const result = generateLoot(entries, baseOptions({ contextId: "65K", budgetGp: 50_000, magicMode: "rare", seed: 1 })); const magic = result.lines.filter(line => line.magic); return magic.length > 0 && magic.every(line => !/Bag of Holding|Flame Tongue|Ring of Protection/i.test(line.name) && /магическ/i.test(line.name)); });
+  check("Removed fields absent from primary DOM", () => { const html = buildDialogContent(DEFAULT_OPTIONS); return !/name=["'](?:lootType|partySize|preference|composition)["']/.test(html) && html.includes("contextCategory") && html.includes("contextId") && html.includes("magicMode"); });
+  check("Context navigation keeps 1K–90K", () => { const html = buildDialogContent(DEFAULT_OPTIONS); const placeSelect = html.match(/<select name="contextId"[\s\S]*?<\/select>/)?.[0] ?? ""; return Object.keys(CONTEXTS).length === 90 && CONTEXTS["1K"].legacyId === "1K" && CONTEXTS["90K"].legacyId === "45K" && html.includes('name="contextCategory"') && (placeSelect.match(/<option /g) ?? []).length < 30; });
+  check("Preview is separate from player chat", () => { const result = generateLoot(entries, baseOptions({ seed: 30_004 })); return buildPreviewContent(result).includes("data-reroll") && !renderLootChat(result).includes("Диагностика"); });
+  check("GM preview has diagnostics", () => { const result = generateLoot(entries, baseOptions({ seed: 30_005 })); return buildPreviewContent(result).includes("svinets-diagnostics"); });
+  check("Player chat has no GM diagnostics", () => { const result = generateLoot(entries, baseOptions({ seed: 30_006 })); const html = renderLootChat(result); return !/Диагностика|coinRange|repair|Требует внимания/.test(html); });
+  check("Player chat excludes internal seed and capacity", () => { const html = renderLootChat(generateLoot(entries, baseOptions({ seed: 30_006 }))); return !/seed|capacity|лимит строк|доля монет/i.test(html); });
+  check("Assets expose all mapped paths", () => { const paths = Object.values(SVINETS_ASSETS).flatMap(value => typeof value === "string" ? [value] : Object.values(value)); return paths.length >= 13 && paths.every(path => path.startsWith("modules/svinets/") && !path.includes("undefined")); });
+  check("Seed remains deterministic", () => stableResultSignature(generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed: 30_007 }))) === stableResultSignature(generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed: 30_007 }))));
+  check("Export flags carry value provenance", () => { const result = generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed: 30_008 })); const valueLine = result.lines.find(line => line.sourceValueClass); return valueLine ? foundryItemData(valueLine).flags.svinets.sourceValueClass === valueLine.sourceValueClass : true; });
+  check("Richness profiles expose operational coin ranges", () => Object.values(RICHNESS_PROFILES).every(profile => Array.isArray(profile.coinRange) && profile.coinRange.length === 2));
+  check("Legacy settings migrate without obsolete keys", () => { const result = generateLoot(entries, { ...baseOptions(), lootType: "hoard", partySize: 6, preference: "combat", partyLevel: "5-10", maxRarity: "rare", magicAllowed: true }); return !Object.keys(result.options).some(key => ["lootType", "partySize", "preference", "partyLevel", "maxRarity", "magicAllowed"].includes(key)); });
+  check("Coin preference stays within bounded context ranges", () => { const few = generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, coinPreference: "few", seed: 30_009 })); const many = generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, coinPreference: "many", seed: 30_009 })); return few.coinRange[1] < many.coinRange[1] && few.itemsCp + few.coinsCp === few.budgetCp && many.itemsCp + many.coinsCp === many.budgetCp; });
+  check("Value carriers expose stack policy and source", () => { const classes = new Set(entries.filter(entry => entry.sourceValueClass).map(entry => entry.sourceValueClass)); return entries.filter(entry => entry.sourceValueClass).every(entry => ["single", "small", "stackable", "bulk"].includes(entry.stackPolicy) && entry.source) && classes.has("gemstone") && classes.has("art_object") && classes.has("trade_good"); });
+  check("Poor-context budget plausibility is explicit", () => generateLoot(entries, baseOptions({ contextId: "1K", budgetGp: 50_000 })).budgetPlausibility.status !== "normal");
+  check("GM diagnostics expose repair and quality flags", () => { const result = generateLoot(entries, baseOptions({ contextId: "35K", budgetGp: 50_000, seed: 30_012 })); return ["coinShareStatus", "contextBudgetStatus", "generationRepair", "qualityFlags"].every(key => key in result) && typeof result.qualityFlags.magicFocusCollision === "boolean"; });
+  check("Context profiles influence category composition", () => { const count = contextId => { const counts = {}; for (let seed = 1; seed <= 30; seed += 1) for (const line of generateLoot(entries, baseOptions({ contextId, budgetGp: 5_000, magicMode: "none", seed, includeFlavor: false })).lines) counts[line.category] = (counts[line.category] ?? 0) + 1; return counts; }; const military = count("21K"); const burial = count("39K"); const magic = count("67K"); return (military.weapon ?? 0) + (military.armor ?? 0) > (military.valuable ?? 0) && (burial.gemstone ?? 0) + (burial.valuable ?? 0) > (burial.weapon ?? 0) && (magic.focus ?? 0) + (magic.consumable ?? 0) + (magic.gear ?? 0) > 0; });
+  check("Preview lock preserves locked line and exact budget", () => { const source = generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed: 30_010 })); if (!source.lines.length) return false; const rerolled = regenerateUnlocked(entries, source, new Set([0]), 1); return rerolled.lines.some(line => line.name === source.lines[0].name && line.totalCp === source.lines[0].totalCp) && rerolled.itemsCp + rerolled.coinsCp === rerolled.budgetCp; });
+  check("Preview replace keeps context and exact budget", () => { const source = generateLoot(entries, baseOptions({ contextId: "72K", budgetGp: 50_000, seed: 30_011 })); if (!source.lines.length) return false; const replaced = replaceLootLine(entries, source, 0, 1); return replaced.itemsCp + replaced.coinsCp === replaced.budgetCp && replaced.lines.every(line => line.totalCp > 0 && line.qty >= 1); });
+  check("Settings keep valid budget bounds", () => SETTINGS.minBudgetGp > 0 && SETTINGS.maxBudgetGp > SETTINGS.minBudgetGp);
+  if (globalThis.console?.group) { console.group("Svinets | Smoke tests"); console.table(tests); if (tests.every(test => test.ok)) console.info(`Все smoke-тесты пройдены: ${tests.length}.`); else console.error("Проваленные тесты:", tests.filter(test => !test.ok)); console.groupEnd(); }
+  return tests;
+}
+
 export { stableResultSignature, runSmokeTests };

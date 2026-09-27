@@ -1,10 +1,11 @@
 import { LOOT_TSV } from "./data.js";
 import { parseLootTable, validateData, generateLoot } from "./generator.js";
 import { ensureSettingsRegistered, saveLastOptions, MODULE_ID } from "./settings.js";
-import { openGenerator } from "./app.js";
-import { postLoot, exportToWorld } from "./export.js";
+import { openGenerator, showPreview } from "./app.js";
+import { postLoot, exportToWorld, bindChatCard } from "./export.js";
 import { runSmokeTests } from "./tests.js";
 import { localize } from "./utils.js";
+import { playResultVfx } from "./vfx.js";
 
 const state = {
   entries: null,
@@ -27,10 +28,12 @@ async function open() {
     return null;
   }
   try {
-    const options = await openGenerator();
+    const options = await openGenerator(state.entries);
     if (!options) return null;
     await saveLastOptions(options);
-    const result = generateLoot(state.entries, options);
+    const generated = generateLoot(state.entries, options);
+    const result = await showPreview(generated, state.entries, candidateOptions => generateLoot(state.entries, candidateOptions));
+    if (!result) return null;
     await postLoot(result);
     if (options.autoExport && options.exportTarget === "world") await exportToWorld(result);
     return result;
@@ -46,12 +49,23 @@ function generate(options) {
   return generateLoot(state.entries, options);
 }
 
+function generateMany(options, count = 3) {
+  if (!game.user?.isGM) throw new Error("Svinets | Генератор лута доступен только Мастеру.");
+  if (!state.entries) throw new Error("Svinets | Таблица лута ещё не инициализирована.");
+  const baseSeed = Number(options?.seed);
+  return Array.from({ length: Math.max(1, Math.min(3, count)) }, (_unused, index) => generateLoot(state.entries, {
+    ...options,
+    seed: Number.isFinite(baseSeed) ? baseSeed + index : null
+  }));
+}
+
 function installApi() {
   const module = game.modules.get(MODULE_ID);
   if (module) {
     module.api = {
       open,
       generate,
+      generateMany,
       get entries() { return state.entries; },
       get report() { return state.report; }
     };
@@ -67,7 +81,7 @@ Hooks.once("ready", () => {
   try {
     state.entries = parseLootTable(LOOT_TSV);
     state.report = validateData(state.entries);
-    console.info(`Svinets | Исходных строк: ${state.report.rawRows}; активных позиций: ${state.report.activeEntries}; объединено повторов: ${state.report.merged}.`);
+    console.info(`Svinets | Generator v6 loaded: ${state.report.rawRows} raw rows; ${state.report.activeEntries} active entries.`);
     if (globalThis.SVINETS_RUN_TESTS === true) runSmokeTests(state.entries);
     state.initialized = true;
     installApi();
@@ -78,16 +92,19 @@ Hooks.once("ready", () => {
 });
 
 Hooks.on("getSceneControlButtons", controls => {
-  if (!game.user?.isGM || !controls.tokens?.tools) return;
-  controls.tokens.tools.svinetsLoot = {
+  if (!game.user?.isGM || !Array.isArray(controls)) return;
+  const tokenControl = controls.find(control => control.name === "token");
+  if (!tokenControl?.tools) return;
+  tokenControl.tools.push({
     name: "svinetsLoot",
     title: localize("SVINETS.SceneControl", "Svinets | Генератор лута"),
     icon: "fa-solid fa-sack-dollar",
-    order: Object.keys(controls.tokens.tools).length,
     button: true,
     visible: true,
     onChange: () => void open()
-  };
+  });
 });
 
-export { open, generate, state };
+Hooks.on("renderChatMessageHTML", (message, html) => bindChatCard(html));
+
+export { open, generate, generateMany, state };

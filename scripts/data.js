@@ -1,10 +1,11 @@
 /**
- * Svinets static data migrated from loot_generator_v5.txt.
+ * Svinets static data migrated from the legacy loot table.
  * The legacy table is intentionally kept byte-for-byte equivalent in content.
- */  const VERSION = '5.0.0';
+ */
+  const VERSION = '6.0.0';
   const FLAG_SCOPE = 'svinets';
-  const FLAG_KEY = 'lootGeneratorV5';
-  const LAST_OPTIONS_KEY = 'loot-generator-v5-last-options';
+  const FLAG_KEY = 'lootGeneratorV6';
+  const LAST_OPTIONS_KEY = 'loot-generator-v6-last-options';
 
   const SETTINGS = Object.freeze({
     minBudgetGp: 0.01,
@@ -282,7 +283,7 @@
   }
 });
 
-  const LOOT_TYPE_PROFILES = Object.freeze({
+  const LEGACY_LOOT_TYPE_PROFILES = Object.freeze({
     individual: { label: 'Индивидуальный', coinShare: [0.40, 0.70], maxMagic: 1, magicModifier: 0.6, extraCoinBias: 1.0 },
     chest:      { label: 'Сундук / тайник', coinShare: [0.20, 0.45], maxMagic: 2, magicModifier: 1.0, extraCoinBias: 1.0 },
     hoard:      { label: 'Клад / сокровищница', coinShare: [0.10, 0.35], maxMagic: 3, magicModifier: 1.4, extraCoinBias: 0.9 },
@@ -291,7 +292,7 @@
     trade:      { label: 'Торговая сделка', coinShare: [0.70, 0.95], maxMagic: 0, magicModifier: 1.0, extraCoinBias: 1.5 }
   });
 
-  const LOOT_TYPE_LINE_MULTIPLIER = Object.freeze({
+  const LEGACY_LOOT_TYPE_LINE_MULTIPLIER = Object.freeze({
     individual: 0.4,
     chest:      0.9,
     hoard:      1.2,
@@ -301,21 +302,21 @@
   });
 
   const STACK_MULTIPLIERS = Object.freeze({
-    consumable:   [2, 3, 5, 10, 20, 30],
-    ammo:         [2, 3, 5, 10, 20, 30],
-    food:         [2, 3, 5, 10, 20, 30],
-    trade_good:   [3, 5, 10, 20, 40, 60],
-    scroll:       [1, 2, 3, 5, 8, 12],
-    magic_potion: [1, 2, 3, 5, 8, 12],
-    magic_ammo:   [1, 2, 3, 5, 8, 12],
-    gemstone:     [2, 3, 5, 10, 15, 25],
-    valuable:     [1, 2, 3, 5, 8, 12],
-    art_object:   [1, 2, 3, 5, 8, 12],
-    container:    [1, 2, 3, 4, 6, 8],
-    gear:         [1, 2, 3, 4, 6, 8]
+    consumable:   [2, 4, 7, 12, 20, 30],
+    ammo:         [2, 4, 7, 12, 20, 30],
+    food:         [2, 4, 7, 12, 20, 30],
+    trade_good:   [3, 6, 12, 24, 40, 60],
+    scroll:       [1, 3, 5, 8, 12, 16],
+    magic_potion: [1, 3, 5, 8, 12, 16],
+    magic_ammo:   [1, 3, 5, 8, 12, 16],
+    gemstone:     [2, 4, 7, 12, 18, 28],
+    valuable:     [1, 3, 4, 6, 10, 14],
+    art_object:   [1, 3, 4, 6, 10, 14],
+    container:    [1, 3, 4, 5, 7, 10],
+    gear:         [1, 3, 4, 5, 7, 10]
   });
 
-  const PARTY_LEVEL_PROFILES = Object.freeze({
+  const LEGACY_PARTY_LEVEL_PROFILES = Object.freeze({
     '1-4':   { label: '1–4',   min: 1,  max: 4,  rarityCap: 'uncommon', maxMagic: 2, rarityWeights: { common: 60, uncommon: 35, rare: 5,  veryRare: 0,  legendary: 0 } },
     '5-10':  { label: '5–10',  min: 5,  max: 10, rarityCap: 'rare',     maxMagic: 3, rarityWeights: { common: 35, uncommon: 40, rare: 20, veryRare: 5,  legendary: 0 } },
     '11-16': { label: '11–16', min: 11, max: 16, rarityCap: 'veryRare', maxMagic: 3, rarityWeights: { common: 15, uncommon: 30, rare: 35, veryRare: 18, legendary: 2 } },
@@ -323,7 +324,7 @@
     any:     { label: 'Любой',  min: 1,  max: 20, rarityCap: 'legendary', maxMagic: 5, rarityWeights: { common: 25, uncommon: 30, rare: 25, veryRare: 15, legendary: 5 } }
   });
 
-  const PREFERENCE_WEIGHTS = Object.freeze({
+  const LEGACY_PREFERENCE_WEIGHTS = Object.freeze({
     balanced: {},
     combat:      { weapon: 2.0, armor: 1.8, ammo: 1.7, magic_weapon: 1.7, magic_armor: 1.6, consumable: 1.2, food: 0.6, leisure: 0.4, instrument: 0.4, valuable: 0.8 },
     utility:     { gear: 1.8, tool: 1.7, container: 1.4, variant: 1.3, focus: 1.2, weapon: 0.6, armor: 0.6 },
@@ -332,7 +333,7 @@
     valuables:   { valuable: 2.0, gemstone: 1.8, art_object: 1.8, trade_good: 1.5, trinket: 1.2, weapon: 0.7, armor: 0.7, gear: 0.7 }
   });
 
-  const LOOT_TYPE_CATEGORY_WEIGHTS = Object.freeze({
+  const LEGACY_LOOT_TYPE_CATEGORY_WEIGHTS = Object.freeze({
     individual: { gear: 1.35, food: 1.2, weapon: 1.05, ammo: 1.05, valuable: 0.7, art_object: 0.45, gemstone: 0.6, trade_good: 0.5, large_vehicle: 0.02 },
     chest:      { valuable: 1.35, gemstone: 1.3, art_object: 1.2, gear: 1.0, weapon: 1.0, armor: 0.9, container: 0.65 },
     hoard:      { valuable: 1.8, gemstone: 2.1, art_object: 2.0, trade_good: 1.25, weapon: 0.9, armor: 0.9, gear: 0.65, food: 0.25 },
@@ -448,6 +449,81 @@
     magic_potion: 'Магические зелья', magic_ring: 'Магические кольца', magic_rod: 'Магические жезлы',
     magic_staff: 'Магические посохи', magic_wand: 'Магические палочки', wondrous: 'Чудесные предметы',
     magic_ammo: 'Магические боеприпасы'
+  });
+
+  const CONTEXT_GROUPS = Object.freeze({
+    housing: { id: '01', label: 'Жильё' },
+    trade: { id: '02', label: 'Торговля' },
+    craft: { id: '03', label: 'Ремесло и производство' },
+    military: { id: '04', label: 'Военные объекты' },
+    nobility: { id: '05', label: 'Власть и знать' },
+    religion: { id: '06', label: 'Религия' },
+    knowledge: { id: '07', label: 'Магия и знания' },
+    dungeon: { id: '08', label: 'Подземелья' },
+    burial: { id: '09', label: 'Погребения' },
+    crime: { id: '10', label: 'Преступный мир' },
+    lair: { id: '11', label: 'Логова существ' },
+    wilderness: { id: '12', label: 'Дикая местность' },
+    travel: { id: '13', label: 'Путешествия и караваны' },
+    maritime: { id: '14', label: 'Море и корабли' },
+    battlefield: { id: '15', label: 'Поле боя' },
+    miscellaneous: { id: '16', label: 'Разное' }
+  });
+
+  const RICHNESS_PROFILES = Object.freeze({
+    poor: { coinRange: [0.35, 0.65], highValue: 0.25, softMin: 1, softMax: 5_000 },
+    normal: { coinRange: [0.20, 0.45], highValue: 0.55, softMin: 250, softMax: 25_000 },
+    rich: { coinRange: [0.10, 0.35], highValue: 0.85, softMin: 1_000, softMax: 100_000 },
+    treasure: { coinRange: [0.05, 0.30], highValue: 1.15, softMin: 5_000, softMax: 500_000 }
+  });
+
+  const CONTEXT_CATEGORY_PROFILES = Object.freeze({
+    domestic: { food: 5, gear: 5, container: 4, clothing: 3, valuable: 1.2, jewelry: 0.8, magic: 0.4, weapon: 1, armor: 0.5 },
+    wealthy: { jewelry: 9, art_object: 8, valuable: 7, gemstone: 6, clothing: 6, document: 4, weapon: 2, magic: 2.5, gear: 1 },
+    workshop: { tool: 8, gear: 7, trade_good: 6, container: 4, weapon: 3, armor: 2, valuable: 1, food: 2 },
+    merchant: { trade_good: 8, gear: 6, container: 5, valuable: 5, jewelry: 3, gemstone: 3, food: 3, weapon: 2 },
+    military: { weapon: 8, armor: 7, ammo: 8, supply: 7, gear: 5, food: 4, valuable: 1, jewelry: 0.5, magic: 1.5 },
+    armory: { weapon: 9, armor: 9, ammo: 8, gear: 3, valuable: 1, magic: 2 },
+    religious: { relic: 8, jewelry: 7, art_object: 6, valuable: 6, focus: 5, scroll: 4, magic: 4, weapon: 2 },
+    knowledge: { document: 8, scroll: 7, magic: 6, tool: 5, focus: 5, valuable: 3, gear: 2 },
+    dungeon: { gemstone: 8, jewelry: 8, art_object: 7, relic: 6, magic: 6, weapon: 4, armor: 3, scroll: 4, consumable: 2, gear: 0.5, food: 0 },
+    burial: { relic: 9, jewelry: 8, gemstone: 7, art_object: 7, magic: 6, weapon: 4, armor: 3, food: 0.1 },
+    crime: { weapon: 7, gear: 6, valuable: 5, trade_good: 5, jewelry: 4, ammo: 5, magic: 2 },
+    lair: { gemstone: 8, valuable: 7, trophy: 6, weapon: 4, armor: 3, food: 3, gear: 2, magic: 4 },
+    wilderness: { food: 7, gear: 6, tool: 5, animal: 5, gemstone: 3, valuable: 2, magic: 1 },
+    travel: { trade_good: 7, gear: 6, food: 6, container: 5, weapon: 4, ammo: 4, valuable: 3 },
+    maritime: { trade_good: 8, gear: 6, container: 6, weapon: 5, ammo: 5, valuable: 5, gemstone: 4, food: 5, magic: 2 },
+    battlefield: { weapon: 9, armor: 8, ammo: 8, supply: 5, gear: 4, valuable: 2, magic: 2 },
+    universal: { valuable: 3, gemstone: 3, art_object: 3, trade_good: 3, weapon: 3, armor: 3, magic: 3, gear: 3 }
+  });
+
+  const CONTEXT_GROUP_BY_ID = Object.freeze({
+    '1K': 'housing', '2K': 'housing', '3K': 'housing', '4K': 'nobility', '5K': 'housing', '6K': 'craft', '7K': 'trade', '8K': 'knowledge', '9K': 'housing', '10K': 'trade', '11K': 'trade', '12K': 'trade', '13K': 'craft', '14K': 'knowledge', '15K': 'trade', '16K': 'travel', '17K': 'craft', '18K': 'craft', '19K': 'wilderness', '20K': 'craft', '21K': 'military', '22K': 'military', '23K': 'military', '24K': 'military', '25K': 'nobility', '26K': 'nobility', '27K': 'military', '28K': 'religion', '29K': 'religion', '30K': 'religion', '31K': 'knowledge', '32K': 'knowledge', '33K': 'knowledge', '34K': 'dungeon', '35K': 'dungeon', '36K': 'dungeon', '37K': 'lair', '38K': 'craft', '39K': 'burial', '40K': 'burial', '41K': 'dungeon', '42K': 'crime', '43K': 'lair', '44K': 'travel', '45K': 'battlefield', '46K': 'maritime', '47K': 'maritime', '48K': 'maritime', '49K': 'maritime', '50K': 'miscellaneous'
+  });
+
+  const NEW_CONTEXTS = Object.freeze([
+    ['51K', 'Ювелирная лавка', 'trade', 'rich', 1.7, 'merchant'], ['52K', 'Казначейство или банк', 'trade', 'treasure', 1.4, 'treasure'], ['53K', 'Сейф торговца', 'trade', 'rich', 1.5, 'merchant'], ['54K', 'Богатый торговый склад', 'trade', 'rich', 1.2, 'merchant'], ['55K', 'Сокровищница храма', 'religion', 'treasure', 1.8, 'religious'],
+    ['56K', 'Спальня дворянина', 'nobility', 'rich', 1.3, 'wealthy'], ['57K', 'Кабинет дворянина', 'nobility', 'rich', 1.1, 'wealthy'], ['58K', 'Комната прислуги', 'housing', 'normal', 0.4, 'domestic'], ['59K', 'Караульный пост', 'military', 'normal', 0.4, 'military'], ['60K', 'Хранилище конфискованных вещей', 'military', 'rich', 1.0, 'fortress'],
+    ['61K', 'Зал гильдии', 'trade', 'rich', 0.9, 'merchant'], ['62K', 'Воровская гильдия', 'crime', 'rich', 1.1, 'bandit'], ['63K', 'Тайник контрабандистов', 'crime', 'rich', 0.9, 'bandit'],
+    ['64K', 'Кабинет мага', 'knowledge', 'rich', 2.0, 'magic_home'], ['65K', 'Хранилище мага', 'knowledge', 'treasure', 2.5, 'magic_shop'], ['66K', 'Магический архив', 'knowledge', 'rich', 2.2, 'magic_academic'], ['67K', 'Алхимическая лаборатория', 'knowledge', 'rich', 1.8, 'alchemy_magic'], ['68K', 'Друидское святилище', 'religion', 'rich', 1.4, 'religious_magic'], ['69K', 'Логово некроманта', 'lair', 'treasure', 2.5, 'religious_magic'],
+    ['70K', 'Заброшенная башня', 'dungeon', 'rich', 1.0, 'ruins'], ['71K', 'Древний храм', 'religion', 'treasure', 1.8, 'religious_magic'], ['72K', 'Драконья сокровищница', 'lair', 'treasure', 2.2, 'treasure'], ['73K', 'Логово великана', 'lair', 'rich', 1.2, 'monster'], ['74K', 'Лагерь гоблинов', 'lair', 'normal', 0.5, 'bandit'], ['75K', 'Лагерь орков', 'lair', 'normal', 0.7, 'bandit'], ['76K', 'Гробница нежити', 'burial', 'treasure', 1.8, 'tomb'],
+    ['77K', 'Кабинет начальника шахты', 'craft', 'rich', 0.8, 'mine'], ['78K', 'Склад руды', 'craft', 'rich', 0.7, 'mine'], ['79K', 'Торговый караван', 'travel', 'rich', 0.8, 'merchant'], ['80K', 'Повозка торговца', 'travel', 'normal', 0.6, 'merchant'], ['81K', 'Брошенная повозка', 'travel', 'normal', 0.35, 'travel'],
+    ['82K', 'Капитанская каюта торгового корабля', 'maritime', 'rich', 1.1, 'trade_ship'], ['83K', 'Трюм торгового корабля', 'maritime', 'rich', 0.8, 'trade_ship'], ['84K', 'Капитанская каюта пиратского корабля', 'maritime', 'rich', 1.3, 'pirate_ship'], ['85K', 'Пиратский тайник', 'maritime', 'treasure', 1.4, 'pirate_ship'], ['86K', 'Оружейная военного корабля', 'maritime', 'normal', 0.8, 'war_ship'], ['87K', 'Капитанская каюта затонувшего корабля', 'maritime', 'rich', 1.0, 'shipwreck'], ['88K', 'Трюм кораблекрушения', 'maritime', 'normal', 0.7, 'shipwreck'], ['89K', 'Офицерская палатка на поле боя', 'battlefield', 'rich', 0.8, 'battlefield'], ['90K', 'Тело павшего офицера', 'battlefield', 'normal', 0.8, 'battlefield']
+  ].map(([id, name, group, richness, magicAffinity, profile]) => ({ id, name, categoryId: group, richness, magicAffinity, profile })));
+
+  const RICHNESS_BY_PROFILE = Object.freeze({ domestic: 'poor', abandoned: 'poor', prison: 'poor', farm: 'poor', tavern: 'normal', inn: 'normal', workshop: 'normal', forge: 'normal', military: 'normal', armory: 'normal', battlefield: 'normal', dungeon: 'normal', cave: 'normal', mine: 'normal', camp: 'normal', bandit: 'normal', monster: 'normal', trade_ship: 'rich', war_ship: 'normal', pirate_ship: 'rich', shipwreck: 'rich', wealthy: 'rich', merchant: 'rich', weapon_shop: 'rich', alchemy: 'rich', magic_shop: 'rich', warehouse: 'rich', fortress: 'rich', religious: 'rich', religious_magic: 'rich', archive: 'rich', magic_home: 'rich', magic_academic: 'rich', alchemy_magic: 'rich', ancient_dungeon: 'rich', ruins: 'rich', tomb: 'rich', treasure: 'treasure', universal: 'normal' });
+  const contextWeights = profile => Object.freeze({ ...(CONTEXT_CATEGORY_PROFILES[profile] ?? CONTEXT_CATEGORY_PROFILES.universal) });
+  const NEW_CONTEXT_LEGACY_FALLBACK = Object.freeze({ trade: '16K', nobility: '26K', housing: '2K', military: '21K', religion: '28K', knowledge: '32K', dungeon: '35K', burial: '39K', crime: '42K', lair: '43K', craft: '38K', travel: '44K', maritime: '46K', battlefield: '45K' });
+  const enrichContext = (id, context) => {
+    const profile = context.profile ?? 'universal';
+    const richness = context.richness ?? RICHNESS_BY_PROFILE[profile] ?? 'normal';
+    const group = context.categoryId ?? CONTEXT_GROUP_BY_ID[id] ?? 'miscellaneous';
+    const richnessMeta = RICHNESS_PROFILES[richness];
+    return Object.freeze({ ...context, id, legacyId: context.legacyId ?? (id === '50K' || !id.endsWith('K') ? id : (id in CONTEXT_GROUP_BY_ID ? id : NEW_CONTEXT_LEGACY_FALLBACK[group] ?? '50K')), categoryId: group, description: context.description ?? context.name, richness, categoryWeights: context.categoryWeights ?? contextWeights(profile), coinRange: context.coinRange ?? richnessMeta.coinRange, tags: context.tags ?? [], excludeTags: context.excludeTags ?? [], recommendedBudget: context.recommendedBudget ?? { softMin: richnessMeta.softMin, softMax: richnessMeta.softMax } });
+  };
+  const CONTEXTS_V6 = Object.freeze({
+    ...Object.fromEntries(Object.entries(CONTEXTS).map(([id, context]) => [id, enrichContext(id, { ...context, categoryId: CONTEXT_GROUP_BY_ID[id] })])),
+    ...Object.fromEntries(NEW_CONTEXTS.map(context => [context.id, enrichContext(context.id, context)]))
   });
 
   // -------------------- 2. МАСТЕР-ТАБЛИЦА --------------------
@@ -1786,4 +1862,4 @@ L1334	Vorpal Sword	200000	4К 8К 14К 25К 26К 28К 29К 30К 32К 33К 35К 3
 L1335	Wand of Orcus	200000	4К 8К 14К 25К 26К 28К 29К 30К 32К 33К 35К 36К 39К 40К 41К 43К	priced	magic_wand	1	DMG 2024	Legendary						
 L1336	Well of Many Worlds	200000	4К 8К 14К 25К 26К 28К 29К 30К 32К 33К 35К 36К 39К 40К 41К 43К	priced	wondrous	1	DMG 2024	Legendary						`;
 
-export { VERSION, FLAG_SCOPE, FLAG_KEY, LAST_OPTIONS_KEY, SETTINGS, STRINGS, CONTEXTS, LOOT_TYPE_PROFILES, LOOT_TYPE_LINE_MULTIPLIER, STACK_MULTIPLIERS, PARTY_LEVEL_PROFILES, PREFERENCE_WEIGHTS, LOOT_TYPE_CATEGORY_WEIGHTS, RARITY_ORDER, RARITY_RANK, RARITY_META, RARITY_BY_BONUS, BASE_CATEGORY_WEIGHT, PROFILE_WEIGHTS, MAGIC_CATEGORIES, ATTUNEMENT_DEFAULT_CATEGORIES, CONSUMABLE_CATEGORIES, ANIMAL_TRANSPORT_CATEGORIES, SINGLE_QTY_CATEGORIES, CATEGORY_LABELS, LOOT_TSV };
+export { VERSION, FLAG_SCOPE, FLAG_KEY, LAST_OPTIONS_KEY, SETTINGS, STRINGS, CONTEXTS_V6 as CONTEXTS, CONTEXT_GROUPS, CONTEXT_CATEGORY_PROFILES, RICHNESS_PROFILES, STACK_MULTIPLIERS, RARITY_ORDER, RARITY_RANK, RARITY_META, RARITY_BY_BONUS, BASE_CATEGORY_WEIGHT, PROFILE_WEIGHTS, MAGIC_CATEGORIES, ATTUNEMENT_DEFAULT_CATEGORIES, CONSUMABLE_CATEGORIES, ANIMAL_TRANSPORT_CATEGORIES, SINGLE_QTY_CATEGORIES, CATEGORY_LABELS, LOOT_TSV };

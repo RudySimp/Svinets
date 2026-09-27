@@ -193,8 +193,8 @@ function localize(key, fallback) {
     return 5;
   }
 
-  function slotCount(budgetGp) {
-    return [4, 6, 10, 14, 18, 22][budgetTier(budgetGp)];
+function slotCount(budgetGp) {
+  return [8, 8, 10, 14, 18, 22][budgetTier(budgetGp)];
   }
 
   function budgetStackMultiplier(budgetGp, category) {
@@ -203,11 +203,11 @@ function localize(key, fallback) {
     return row ? row[tier] : 1;
   }
 
-  function minimumLineCount(maxLines, budgetGp, lootType) {
-    if (lootType === 'trade' || maxLines <= 0) return 0;
+function minimumLineCount(maxLines, budgetGp, scaleClass) {
+    if (scaleClass === 'trade' || maxLines <= 0) return 0;
     const ratio = [0.50, 0.60, 0.70, 0.78, 0.82, 0.90][budgetTier(budgetGp)];
     return Math.min(maxLines, Math.max(1, Math.ceil(maxLines * ratio)));
-  }
+}
 
 
 export { localize, clamp, normalizeContextId, gpToCp, cpToGp, formatNumber, formatGp, formatCoins, escapeHTML, mulberry32, createRng, randomInt32, weightedPick, gaussianFit, uniqueBy, rarityRank, normalizeRarity, parseOptionalBoolean, inferScrollRarity, inferRarity, isMagicEntry, isConsumableEntry, budgetTier, slotCount, budgetStackMultiplier, minimumLineCount };

@@ -1,125 +1,140 @@
-import {
-  CONTEXTS,
-  LOOT_TYPE_PROFILES,
-  PARTY_LEVEL_PROFILES,
-  STRINGS
-} from "./data.js";
-import { escapeHTML, localize } from "./utils.js";
-import { sanitizeOptions } from "./generator.js";
-import {
-  DEFAULT_OPTIONS,
-  getLastOptions,
-  saveLastOptions
-} from "./settings.js";
-function getLocalizedStrings() {
-  return {
-    title: localize("SVINETS.Title", STRINGS.title),
-    generate: localize("SVINETS.Generate", STRINGS.generate),
-    saveSettings: localize("SVINETS.SaveSettings", STRINGS.saveSettings),
-    cancel: localize("SVINETS.Cancel", STRINGS.cancel),
-    placeSection: localize("SVINETS.PlaceSection", STRINGS.placeSection),
-    typeSection: localize("SVINETS.TypeSection", STRINGS.typeSection),
-    budgetSection: localize("SVINETS.BudgetSection", STRINGS.budgetSection),
-    partySection: localize("SVINETS.PartySection", STRINGS.partySection),
-    magicSection: localize("SVINETS.MagicSection", STRINGS.magicSection),
-    compositionSection: localize("SVINETS.CompositionSection", STRINGS.compositionSection),
-    limitsSection: localize("SVINETS.LimitsSection", STRINGS.limitsSection),
-    extraSection: localize("SVINETS.ExtraSection", STRINGS.extraSection)
+import { CONTEXTS, CONTEXT_GROUPS, SETTINGS, STRINGS } from "./data.js";
+import { escapeHTML, formatCoins, formatGp, formatNumber, localize } from "./utils.js";
+import { analyzeContextRichness, budgetPlausibility, generateLoot, isOversizedBudget, regenerateUnlocked, replaceLootLine, sanitizeOptions } from "./generator.js";
+import { SVINETS_ASSETS, bindAssetFallback, categoryAsset } from "./assets.js";
+import { renderDiagnostics } from "./diagnostics.js";
+import { DEFAULT_OPTIONS, getLastOptions, saveLastOptions } from "./settings.js";
+
+const MAGIC_CHOICES = Object.freeze([
+  ["automatic", "Автоматически"], ["none", "Без магии"], ["common", "До обычных"],
+  ["uncommon", "До необычных"], ["rare", "До редких"], ["veryRare", "До очень редких"], ["legendary", "До легендарных"]
+]);
+const LEVEL_CHOICES = Object.freeze([["ignore", "Не учитывать"], ["1-4", "1–4"], ["5-10", "5–10"], ["11-16", "11–16"], ["17-20", "17–20"]]);
+const COIN_CHOICES = Object.freeze([["automatic", "Автоматически"], ["few", "Мало"], ["medium", "Средне"], ["many", "Много"]]);
+const GROUPS = Object.freeze(Object.entries(CONTEXT_GROUPS));
+
+function contextGroupId(contextId) { return CONTEXTS[contextId]?.categoryId ?? "miscellaneous"; }
+function selected(value, expected) { return value === expected ? " selected" : ""; }
+function checked(value) { return value ? " checked" : ""; }
+
+function placeOptions(categoryId, contextId) {
+  return Object.entries(CONTEXTS).filter(([, context]) => context.categoryId === categoryId).map(([id, context]) => `<option value="${id}"${selected(contextId, id)}>${id} — ${escapeHTML(context.name)}</option>`).join("");
+}
+
+function buildDialogContent(rawDefaults = {}) {
+  const d = { ...DEFAULT_OPTIONS, ...rawDefaults };
+  const categoryId = contextGroupId(d.contextId);
+  const categoryOptions = GROUPS.map(([key, group]) => `<option value="${key}"${selected(categoryId, key)}>${group.id}. ${escapeHTML(group.label)}</option>`).join("");
+  const magicOptions = MAGIC_CHOICES.map(([value, label]) => `<option value="${value}"${selected(d.magicMode, value)}>${label}</option>`).join("");
+  const coinOptions = COIN_CHOICES.map(([value, label]) => `<option value="${value}"${selected(d.coinPreference, value)}>${label}</option>`).join("");
+  const levelOptions = LEVEL_CHOICES.map(([value, label]) => `<option value="${value}"${selected(d.levelBand, value)}>${label}</option>`).join("");
+  return `<div class="svinets-generator" data-svinets-root>
+    <header class="svinets-generator__hero"><img src="${SVINETS_ASSETS.logo}" alt="Логотип Svinets"><div><h2>Svinets</h2><p>Правдоподобная добыча по месту, бюджету и магии.</p></div></header>
+    <section class="svinets-section svinets-main-fields">
+      <label><span>Категория места</span><select name="contextCategory" data-context-category>${categoryOptions}</select></label>
+      <label><span>Место</span><select name="contextId" data-context-place>${placeOptions(categoryId, d.contextId)}</select></label>
+      <label><span>Общая стоимость</span><div class="svinets-input-with-suffix"><input name="budgetGp" type="number" min="${SETTINGS.minBudgetGp}" max="${SETTINGS.maxBudgetGp}" step="0.01" value="${escapeHTML(d.budgetGp)}" required><span>зм</span></div></label>
+      <label><span>Магические предметы</span><select name="magicMode">${magicOptions}</select></label>
+    </section>
+    <aside class="svinets-live-preview" aria-live="polite"><img src="${SVINETS_ASSETS.actions.random}" alt="" aria-hidden="true"><div><b>Готово к генерации</b><span data-validation>Выберите место и бюджет.</span></div></aside>
+    <details class="svinets-advanced"><summary>Дополнительно</summary><div class="svinets-details-body">
+      <label><span>Уровень группы для предупреждений</span><select name="levelBand">${levelOptions}</select></label>
+      <label><span>Доля монет</span><select name="coinPreference">${coinOptions}</select></label>
+      <label><span>Seed для повторяемости</span><input name="seed" type="number" step="1" value="${Number.isFinite(d.seed) ? escapeHTML(d.seed) : ""}" placeholder="случайный"></label>
+      <label class="svinets-check"><input name="includeFlavor" type="checkbox"${checked(d.includeFlavor)}><span>Добавлять атмосферные детали</span></label>
+      <label class="svinets-check"><input name="useWeightLimit" type="checkbox"${checked(d.useWeightLimit)}><span>Учитывать лимит веса</span></label>
+      <label data-weight-row${d.useWeightLimit ? "" : " hidden"}><span>Максимальный вес, фн.</span><input name="maxWeight" type="number" min="1" step="1" value="${escapeHTML(d.maxWeight)}"></label>
+      <label class="svinets-check"><input name="autoExport" type="checkbox"${checked(d.autoExport)}><span>После публикации создать предметы мира</span></label>
+      <label data-export-row${d.autoExport ? "" : " hidden"}><span>Экспорт</span><select name="exportTarget"><option value="chat"${selected(d.exportTarget, "chat")}>Чат</option><option value="world"${selected(d.exportTarget, "world")}>Чат и предметы мира</option></select></label>
+      <button type="button" class="svinets-save" data-save-settings>Сохранить настройки</button>
+    </div></details>
+  </div>`;
+}
+
+function readDialogForm(form) {
+  const el = name => form.elements.namedItem(name);
+  const value = name => el(name)?.value;
+  const number = name => el(name)?.valueAsNumber;
+  const bool = name => Boolean(el(name)?.checked);
+  return { contextId: value("contextId"), budgetGp: number("budgetGp"), magicMode: value("magicMode"), coinPreference: value("coinPreference"), levelBand: value("levelBand"), seed: value("seed"), includeFlavor: bool("includeFlavor"), useWeightLimit: bool("useWeightLimit"), maxWeight: number("maxWeight"), autoExport: bool("autoExport"), exportTarget: value("exportTarget") };
+}
+
+function validateForm(form) {
+  const options = readDialogForm(form); const errors = [];
+  if (!Number.isFinite(options.budgetGp) || options.budgetGp < SETTINGS.minBudgetGp || options.budgetGp > SETTINGS.maxBudgetGp) errors.push(`Бюджет: ${SETTINGS.minBudgetGp}–${formatNumber(SETTINGS.maxBudgetGp)} зм.`);
+  if (!CONTEXTS[options.contextId]) errors.push("Выберите место находки.");
+  if (options.useWeightLimit && (!Number.isFinite(options.maxWeight) || options.maxWeight <= 0)) errors.push("Укажите положительный лимит веса.");
+  return errors;
+}
+
+function bindDialogControls(scope = globalThis.document, entries = []) {
+  const root = scope?.querySelector?.("[data-svinets-root]") ?? globalThis.document?.querySelector?.("[data-svinets-root]"); if (!root || root.dataset.bound === "true") return;
+  root.dataset.bound = "true"; const form = root.closest("form"); if (!form) return;
+  bindAssetFallback(root);
+  const update = () => {
+    const options = readDialogForm(form); const errors = validateForm(form); const context = CONTEXTS[options.contextId];
+    const validation = root.querySelector("[data-validation]");
+    const richness = entries.length && context ? analyzeContextRichness(entries, options.contextId) : { richness: "adequate" };
+    const oversized = isOversizedBudget(options.budgetGp, options.levelBand);
+    const plausibility = context ? budgetPlausibility(options.contextId, options.budgetGp || 0) : { status: "normal" };
+    if (validation) { validation.className = `svinets-validation ${errors.length ? "is-danger" : richness.richness === "poor" || oversized || plausibility.status !== "normal" ? "is-warning" : "is-success"}`; validation.textContent = errors[0] ?? (plausibility.warning ?? (richness.richness === "poor" ? "Для этого места бюджет выглядит необычно большим." : oversized ? "Стоимость выше обычного диапазона группы." : `${context?.name ?? "Место"} · ${formatNumber(options.budgetGp || 0)} зм.`)); }
+    root.closest(".application, .dialog")?.querySelectorAll?.("button[data-action='ok']").forEach(button => { button.disabled = errors.length > 0; });
   };
+  form.elements.contextCategory?.addEventListener("change", event => { const categoryId = event.currentTarget.value; const current = form.elements.contextId.value; const next = Object.entries(CONTEXTS).find(([id, context]) => context.categoryId === categoryId && id === current) ?? Object.entries(CONTEXTS).find(([, context]) => context.categoryId === categoryId); if (next) { form.elements.contextId.value = next[0]; root.querySelector("[data-context-place]").replaceChildren(...new DOMParser().parseFromString(`<select>${placeOptions(categoryId, next[0])}</select>`, "text/html").querySelector("select").children); } update(); });
+  form.elements.useWeightLimit?.addEventListener("change", event => { root.querySelector("[data-weight-row]").hidden = !event.currentTarget.checked; update(); });
+  form.elements.autoExport?.addEventListener("change", event => { root.querySelector("[data-export-row]").hidden = !event.currentTarget.checked; update(); });
+  root.querySelector("[data-save-settings]")?.addEventListener("click", async () => { const errors = validateForm(form); if (errors.length) return globalThis.ui?.notifications?.error(errors[0]); await saveLastOptions(sanitizeOptions(readDialogForm(form))); globalThis.ui?.notifications?.info("Svinets | Настройки сохранены."); });
+  form.addEventListener("input", update); form.addEventListener("change", update); update();
 }
 
-function selected(value, expected) { return value === expected ? ' selected' : ''; }
-function checked(value) { return value ? ' checked' : ''; }
-
-  function buildDialogContent(d) {
-    const strings = getLocalizedStrings();
-    const contexts = Object.entries(CONTEXTS).map(([id,c]) => `<option value="${id}"${selected(d.contextId,id)}>${id} — ${escapeHTML(c.name)}</option>`).join('');
-    const lootTypes = [
-      ['individual','Индивидуальная находка — один труп, карман, сумка'],['chest','Сундук или тайник — небольшой клад'],['hoard','Крупный клад — сокровищница, драконья пещера'],
-      ['merchant','Товарный запас — склад, магазин, обоз'],['trophy','Трофей с босса — награда за победу'],['trade','Торговая сделка — оплата, выкуп']
-    ].map(([v,l])=>`<option value="${v}"${selected(d.lootType,v)}>${l}</option>`).join('');
-    const levelOptions = [['1-4','1–4'],['5-10','5–10'],['11-16','11–16'],['17-20','17–20'],['any','Любой']].map(([v,l])=>`<option value="${v}"${selected(d.partyLevel,v)}>${l}</option>`).join('');
-    const rarityOptions = [['common','Обычные'],['uncommon','Необычные'],['rare','Редкие'],['veryRare','Очень редкие'],['legendary','Легендарные'],['any','На усмотрение уровня партии']].map(([v,l])=>`<option value="${v}"${selected(d.maxRarity,v)}>${l}</option>`).join('');
-    const prefOptions = [['balanced','Сбалансированно'],['combat','Боевое снаряжение'],['utility','Полезные предметы'],['magical','Магические предметы'],['consumables','Расходники'],['valuables','Ценности и камни']].map(([v,l])=>`<option value="${v}"${selected(d.preference,v)}>${l}</option>`).join('');
-
-    const sectionStyle='margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid var(--color-border-light-primary);';
-    const hintStyle='margin:3px 0 6px;color:#777;font-size:0.88em;line-height:1.25;';
-    return `<div id="svinets-generator-form" class="svinets-generator">
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.placeSection}</h3><div class="form-group"><label>Место</label><select name="contextId">${contexts}</select></div></section>
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.typeSection}</h3><div class="form-group"><label>Тип лута</label><select name="lootType">${lootTypes}</select></div><p class="svinets-hint" style="${hintStyle}">Влияет на количество предметов и долю монет.</p></section>
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.budgetSection}</h3><div class="form-group"><label>Общая стоимость, зм</label><input name="budgetGp" type="number" min="0.01" max="1000000000" step="0.01" value="${escapeHTML(d.budgetGp)}"></div><p class="svinets-hint" style="${hintStyle}">Итоговая сумма: стоимость предметов + монеты. Монеты автоматически досчитываются до этой суммы.</p></section>
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.partySection}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div class="form-group"><label>Уровень партии</label><select name="partyLevel">${levelOptions}</select></div><div class="form-group"><label>Размер партии</label><input name="partySize" type="number" min="1" max="10" step="1" value="${escapeHTML(d.partySize)}"></div></div><p class="svinets-hint" style="${hintStyle}">Уровень влияет на максимальную редкость магических предметов. Размер партии влияет на количество расходников и слотов настройки.</p></section>
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.magicSection}</h3><div class="form-group"><label><input name="magicAllowed" type="checkbox"${checked(d.magicAllowed)}> Разрешить магические предметы</label></div><div class="form-group"><label>Максимальная редкость</label><select name="maxRarity">${rarityOptions}</select></div><div class="form-group"><label><input name="allowLegendary" type="checkbox"${checked(d.allowLegendary)}> Разрешить легендарные предметы</label></div><div class="form-group"><label>Максимум магических предметов в луте</label><input name="maxMagicItems" type="number" min="0" max="5" step="1" value="${escapeHTML(d.maxMagicItems)}"></div><p class="svinets-hint" style="${hintStyle}">Если магия отключена — генерируются только обычные предметы и монеты.</p></section>
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.compositionSection}</h3><div class="form-group"><label>Что важнее</label><select name="preference">${prefOptions}</select></div><div class="form-group"><label>Доля расходников</label><input id="svinets-consumables" name="consumablesSlider" type="range" min="0" max="100" step="1" value="${escapeHTML(d.consumablesSlider)}"><span id="svinets-consumables-value" style="margin-left:8px;">${escapeHTML(d.consumablesSlider)} из 100</span></div><p class="svinets-hint" style="${hintStyle}">0 — постоянные предметы, 100 — расходники.</p><div class="form-group"><label><input name="includeFlavor" type="checkbox"${checked(d.includeFlavor)}> Добавлять атмосферные предметы без цены</label></div><div class="form-group"><label><input name="includeAnimals" type="checkbox"${checked(d.includeAnimals)}> Включать животных и транспорт</label></div><div class="form-group"><label><input name="includeBarding" type="checkbox"${checked(d.includeBarding)}> Включать бардинг</label></div></section>
-      <section class="svinets-section" style="${sectionStyle}"><h3>${strings.limitsSection}</h3><div class="form-group"><label><input name="useAttunement" type="checkbox"${checked(d.useAttunement)}> Учитывать настройку магических предметов (attunement)</label></div><p class="svinets-hint" style="${hintStyle}">Сумма слотов настройки — размер партии × 3.</p><div class="form-group"><label><input id="svinets-use-weight" name="useWeightLimit" type="checkbox"${checked(d.useWeightLimit)}> Ограничить общий вес</label></div><div id="svinets-weight-row" class="form-group" style="${d.useWeightLimit?'':'display:none;'}"><label>Максимум, фунты</label><input name="maxWeight" type="number" min="1" step="1" value="${escapeHTML(d.maxWeight)}"></div><p class="svinets-hint" style="${hintStyle}">Вес отслеживается для оружия, брони, снаряжения, инструментов, инструментов музыканта, боеприпасов и контейнеров. Официально невесомые позиции считаются как 0.</p><div class="form-group"><label><input name="noDuplicates" type="checkbox"${checked(d.noDuplicates)}> Не повторять названия предметов</label></div><div class="form-group"><label><input name="noFamilies" type="checkbox"${checked(d.noFamilies)}> Не выдавать две вещи из одной семьи</label></div><div class="form-group"><label>Максимум строк в списке</label><input name="maxLines" type="number" min="0" max="24" step="1" value="${escapeHTML(d.maxLines)}"></div><p class="svinets-hint" style="${hintStyle}">0 — автоматически по бюджету и типу лута.</p></section>
-      <section class="svinets-section" style="margin:0;"><h3>${strings.extraSection}</h3><div class="form-group"><label><input id="svinets-auto-export" name="autoExport" type="checkbox"${checked(d.autoExport)}> Экспортировать предметы после генерации</label></div><div id="svinets-export-row" class="form-group" style="${d.autoExport?'':'display:none;'}"><label>Куда экспортировать</label><select name="exportTarget"><option value="chat"${selected(d.exportTarget,'chat')}>Только в чат</option><option value="world"${selected(d.exportTarget,'world')}>В предметы мира</option></select></div><div class="form-group"><label>Seed для повторяемости</label><input name="seed" type="number" step="1" value="${Number.isFinite(d.seed)?escapeHTML(d.seed):''}"></div><p class="svinets-hint" style="${hintStyle}">Если указать seed — результат можно воспроизвести. Оставьте пустым для случайности.</p><button id="svinets-save-settings" type="button"><i class="fa-solid fa-floppy-disk"></i> ${strings.saveSettings}</button></section>
-    </div>`;
-  }
-
-  function readDialogForm(form) {
-    return {
-      contextId:form.elements.contextId.value, lootType:form.elements.lootType.value, budgetGp:form.elements.budgetGp.valueAsNumber,
-      partyLevel:form.elements.partyLevel.value, partySize:form.elements.partySize.valueAsNumber,
-      magicAllowed:form.elements.magicAllowed.checked, maxRarity:form.elements.maxRarity.value, allowLegendary:form.elements.allowLegendary.checked, maxMagicItems:form.elements.maxMagicItems.valueAsNumber,
-      preference:form.elements.preference.value, consumablesSlider:form.elements.consumablesSlider.valueAsNumber,
-      includeFlavor:form.elements.includeFlavor.checked, includeAnimals:form.elements.includeAnimals.checked, includeBarding:form.elements.includeBarding.checked,
-      useAttunement:form.elements.useAttunement.checked, useWeightLimit:form.elements.useWeightLimit.checked, maxWeight:form.elements.maxWeight.valueAsNumber,
-      noDuplicates:form.elements.noDuplicates.checked, noFamilies:form.elements.noFamilies.checked, maxLines:form.elements.maxLines.valueAsNumber,
-      autoExport:form.elements.autoExport.checked, exportTarget:form.elements.exportTarget.value, seed:form.elements.seed.value
-    };
-  }
-
-  function bindDialogControls(attempt = 0) {
-    const root = document.getElementById('svinets-generator-form');
-    if (!root) {
-      if (attempt < 30) requestAnimationFrame(() => bindDialogControls(attempt + 1));
-      return;
-    }
-    const slider=root.querySelector('#svinets-consumables');
-    const sliderValue=root.querySelector('#svinets-consumables-value');
-    slider?.addEventListener('input',()=>{ if (sliderValue) sliderValue.textContent=`${slider.value} из 100`; });
-    const weightToggle=root.querySelector('#svinets-use-weight');
-    const weightRow=root.querySelector('#svinets-weight-row');
-    weightToggle?.addEventListener('change',()=>{ if(weightRow) weightRow.style.display=weightToggle.checked?'':'none'; });
-    const exportToggle=root.querySelector('#svinets-auto-export');
-    const exportRow=root.querySelector('#svinets-export-row');
-    exportToggle?.addEventListener('change',()=>{ if(exportRow) exportRow.style.display=exportToggle.checked?'':'none'; });
-    root.querySelector('#svinets-save-settings')?.addEventListener('click',async()=>{
-      try {
-        const form=root.closest('form');
-        if (!form) throw new Error('Форма не найдена.');
-        const clean=sanitizeOptions(readDialogForm(form));
-        await saveLastOptions(clean);
-        ui.notifications.info('Настройки сохранены.');
-      } catch(error) { ui.notifications.error(`Настройки не сохранены: ${error.message}`); }
-    });
-  }
-
-  async function askOptions() {
-    const defaults={...DEFAULT_OPTIONS,...getLastOptions()};
-    const strings = getLocalizedStrings();
-    const DialogV2 = foundry?.applications?.api?.DialogV2;
-    if (!DialogV2?.prompt) throw new Error('Для генератора требуется foundry.applications.api.DialogV2 из Foundry v14.');
-    const promise=DialogV2.prompt({
-      window:{title:strings.title}, content:buildDialogContent(defaults), modal:true, rejectClose:false,
-      ok:{ label:strings.generate, icon:'fa-solid fa-dice', callback:(event,button)=>sanitizeOptions(readDialogForm(button.form),{notify:true}) },
-      buttons:[{ action:'cancel', label:strings.cancel, callback:()=>null }]
-    });
-    requestAnimationFrame(()=>bindDialogControls());
-    return await promise;
-  }
-async function openGenerator() {
-  if (!game.user?.isGM) {
-    ui.notifications.warn("Генератор лута доступен только Мастеру.");
-    return null;
-  }
-  return askOptions();
+function recomputeResult(result, lines) {
+  const itemsCp = lines.reduce((sum, line) => sum + line.totalCp, 0);
+  return { ...result, lines, itemsCp, coinsCp: result.budgetCp - itemsCp, actualCoinShare: result.budgetCp ? (result.budgetCp - itemsCp) / result.budgetCp : 1, coinRangeSatisfied: (result.budgetCp - itemsCp) >= 0 };
 }
 
-export {
-  buildDialogContent,
-  readDialogForm,
-  bindDialogControls,
-  askOptions,
-  openGenerator
-};
+function mergeLocked(next, current, locked) {
+  const lines = [...next.lines];
+  for (const index of locked) if (current.lines[index]) lines[index] = { ...current.lines[index] };
+  while (lines.length && lines.reduce((sum, line) => sum + line.totalCp, 0) > next.budgetCp) {
+    const removable = lines.findIndex((line, index) => !locked.has(index));
+    if (removable < 0) break;
+    lines.splice(removable, 1);
+  }
+  return recomputeResult(next, lines);
+}
+
+function previewLine(line, index, locked) {
+  return `<li class="svinets-preview-line${locked.has(index) ? " is-locked" : ""}"><img src="${categoryAsset(line)}" alt="" aria-hidden="true"><span><strong>${escapeHTML(line.name)}</strong><small>${line.qty > 1 ? `× ${line.qty} · ` : ""}${escapeHTML(formatGp(line.totalCp))}</small></span><button type="button" data-lock-line="${index}" title="Закрепить строку" aria-label="Закрепить строку">${locked.has(index) ? "🔒" : "🔓"}</button><button type="button" data-replace-line="${index}" title="Заменить строку" aria-label="Заменить строку">↻</button></li>`;
+}
+
+function buildPreviewContent(result, locked = new Set()) {
+  return `<div class="svinets-preview-root" data-preview-root><header class="svinets-preview__header"><img src="${SVINETS_ASSETS.logo}" alt="Svinets"><div><h2>Предпросмотр добычи</h2><p>${escapeHTML(result.contextName)} · ${formatNumber(result.budgetCp / 100)} зм</p></div></header><div class="svinets-preview__actions"><button type="button" data-reroll>Перегенерировать незакреплённое</button><span data-preview-budget>Предметы ${escapeHTML(formatGp(result.itemsCp))} · Монеты ${escapeHTML(formatCoins(result.coinsCp))}</span></div><ol class="svinets-preview-lines">${result.lines.map((line, index) => previewLine(line, index, locked)).join("")}</ol>${result.flavors?.length ? `<p class="svinets-flavors"><b>Атмосфера:</b> ${result.flavors.map(item => escapeHTML(item.name)).join(" · ")}</p>` : ""}${renderDiagnostics(result)}</div>`;
+}
+
+function replacePreviewRoot(scope, state, entries, generate) {
+  const root = scope.querySelector("[data-preview-root]"); if (!root) return;
+  const fragment = document.createRange().createContextualFragment(buildPreviewContent(state.result, state.locked)); const next = fragment.firstElementChild; root.replaceWith(next); bindPreviewControls(scope, state, entries, generate);
+}
+
+function bindPreviewControls(scope, state, entries, generate) {
+  const root = scope.querySelector("[data-preview-root]"); if (!root || root.dataset.bound === "true") return; root.dataset.bound = "true";
+  bindAssetFallback(root);
+  root.querySelectorAll("[data-lock-line]").forEach(button => button.addEventListener("click", () => { const index = Number(button.dataset.lockLine); if (state.locked.has(index)) state.locked.delete(index); else state.locked.add(index); replacePreviewRoot(scope, state, entries, generate); }));
+  root.querySelectorAll("[data-replace-line]").forEach(button => button.addEventListener("click", () => { const index = Number(button.dataset.replaceLine); if (state.locked.has(index)) return; state.result = replaceLootLine(entries, state.result, index, ++state.revision); if (!state.result.replacementFound) globalThis.ui?.notifications?.warn("Подходящая замена не найдена; стоимость строки возвращена в монеты."); replacePreviewRoot(scope, state, entries, generate); }));
+  root.querySelector("[data-reroll]")?.addEventListener("click", () => { state.result = regenerateUnlocked(entries, state.result, state.locked, ++state.revision); replacePreviewRoot(scope, state, entries, generate); });
+}
+
+async function showPreview(result, entries, generate = options => generateLoot(entries, options)) {
+  const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2; if (!DialogV2?.prompt) return result;
+  const state = { result, locked: new Set(), revision: 0 };
+  return DialogV2.prompt({ window: { title: "Svinets | Предпросмотр" }, classes: ["svinets-dialog"], content: buildPreviewContent(state.result), modal: true, rejectClose: false, render: (_event, dialog) => bindPreviewControls(dialog.element, state, entries, generate), ok: { label: "Опубликовать в чат", icon: "fa-solid fa-message", callback: () => state.result }, buttons: [{ action: "cancel", label: "Отмена", callback: () => null }] });
+}
+
+async function askOptions(entries = []) {
+  const defaults = { ...DEFAULT_OPTIONS, ...getLastOptions() }; const strings = { title: localize("SVINETS.Title", STRINGS.title), generate: localize("SVINETS.Generate", STRINGS.generate), cancel: localize("SVINETS.Cancel", STRINGS.cancel) }; const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2; if (!DialogV2?.prompt) throw new Error("Для генератора требуется foundry.applications.api.DialogV2 из Foundry v14.");
+  return DialogV2.prompt({ window: { title: strings.title, icon: "fa-solid fa-coins" }, classes: ["svinets-dialog"], content: buildDialogContent(defaults), modal: true, rejectClose: false, render: (_event, dialog) => bindDialogControls(dialog.element, entries), ok: { label: strings.generate, icon: "fa-solid fa-dice", callback: (_event, button) => sanitizeOptions(readDialogForm(button.form), { notify: true }) }, buttons: [{ action: "cancel", label: strings.cancel, callback: () => null }] });
+}
+
+async function openGenerator(entries = []) { if (!globalThis.game?.user?.isGM) { globalThis.ui?.notifications?.warn(localize("SVINETS.NotGM", "Генератор лута доступен только Мастеру.")); return null; } return askOptions(entries); }
+
+export { buildDialogContent, readDialogForm, validateForm, bindDialogControls, buildPreviewContent, showPreview, askOptions, openGenerator, contextGroupId };
