@@ -35,7 +35,8 @@ function categoryAsset(line) {
 }
 
 function bindAssetFallback(root = globalThis.document) {
-  root?.querySelectorAll?.(`img[src^="${MODULE_ROOT}/"]`).forEach(image => {
+  const element = root?.jquery ? root[0] : root;
+  element?.querySelectorAll?.(`img[src^="${MODULE_ROOT}/"]`).forEach(image => {
     image.addEventListener("error", () => { image.hidden = true; }, { once: true });
   });
 }

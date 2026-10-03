@@ -131,7 +131,7 @@ async function showPreview(result, entries, generate = options => generateLoot(e
 }
 
 async function askOptions(entries = []) {
-  const defaults = { ...DEFAULT_OPTIONS, ...getLastOptions() }; const strings = { title: localize("SVINETS.Title", STRINGS.title), generate: localize("SVINETS.Generate", STRINGS.generate), cancel: localize("SVINETS.Cancel", STRINGS.cancel) }; const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2; if (!DialogV2?.prompt) throw new Error("Для генератора требуется foundry.applications.api.DialogV2 из Foundry v14.");
+  const defaults = { ...DEFAULT_OPTIONS, ...getLastOptions() }; const strings = { title: localize("SVINETS.Title", STRINGS.title), generate: localize("SVINETS.Generate", STRINGS.generate), cancel: localize("SVINETS.Cancel", STRINGS.cancel) }; const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2; if (!DialogV2?.prompt) throw new Error("Для генератора требуется foundry.applications.api.DialogV2 из Foundry v12.");
   return DialogV2.prompt({ window: { title: strings.title, icon: "fa-solid fa-coins" }, classes: ["svinets-dialog"], content: buildDialogContent(defaults), modal: true, rejectClose: false, render: (_event, dialog) => bindDialogControls(dialog.element, entries), ok: { label: strings.generate, icon: "fa-solid fa-dice", callback: (_event, button) => sanitizeOptions(readDialogForm(button.form), { notify: true }) }, buttons: [{ action: "cancel", label: strings.cancel, callback: () => null }] });
 }
 

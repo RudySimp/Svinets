@@ -68,11 +68,13 @@ function localize(key, fallback) {
   }
 
   function createRng(seed) {
-    return Number.isFinite(seed) ? mulberry32(Math.trunc(seed)) : Math.random;
+    return mulberry32(Number.isFinite(seed) ? Math.trunc(seed) : randomInt32());
   }
 
   function randomInt32() {
-    return Math.floor(Math.random() * 2_147_483_647);
+    const values = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(values);
+    return values[0] & 0x7FFFFFFF;
   }
 
   function weightedPick(items, weightFn, rng) {

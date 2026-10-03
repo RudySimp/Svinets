@@ -42,7 +42,7 @@ async function exportToWorld(result) {
   const itemData = result.lines.map(foundryItemData);
   if (!itemData.length) { globalThis.ui?.notifications?.warn("В добыче нет ценовых предметов для экспорта."); return []; }
   try {
-    const creator = typeof globalThis.Item?.createDocuments === "function" ? globalThis.Item.createDocuments.bind(globalThis.Item) : globalThis.CONFIG?.Item?.documentClass?.createDocuments?.bind(globalThis.CONFIG.Item.documentClass);
+    const creator = typeof globalThis.Item?.createDocuments === "function" ? globalThis.Item.createDocuments.bind(globalThis.Item) : null;
     if (!creator) throw new Error("Публичный API создания Item-документов недоступен.");
     const created = await creator(itemData); globalThis.ui?.notifications?.info(`Создано предметов мира: ${created.length}.`); return created;
   } catch (error) { console.error("Svinets | Ошибка экспорта:", error); globalThis.ui?.notifications?.error(`Экспорт не выполнен: ${error.message}`); return []; }
@@ -75,7 +75,8 @@ function renderLootChat(result, { compact = result.lines.length > 20 } = {}) {
 }
 
 function bindChatCard(html) {
-  const root = html?.querySelector?.("[data-svinets-card]") ?? html;
+  const element = html?.jquery ? html[0] : html;
+  const root = element?.querySelector?.("[data-svinets-card]") ?? element;
   bindAssetFallback(root);
   playResultVfx(root, { options: {}, lines: [] });
   root?.querySelectorAll?.("[data-magic-info]").forEach(button => button.addEventListener("click", () => globalThis.ui?.notifications?.info(`Источник магии: ${button.dataset.magicInfo}`)));

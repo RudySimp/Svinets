@@ -1,21 +1,25 @@
-# Svinets
+# Svinets — Foundry VTT v12
 
-Svinets is a loot generator module for Foundry Virtual Tabletop v14.
+> **ВАЖНО:** эта ветка предназначена только для Foundry VTT v12.
 
-## Installation
-
-In Foundry, install the module from the manifest URL:
+Для Foundry VTT v14 используйте:
 
 `https://github.com/RudySimp/Svinets/releases/latest/download/module.json`
 
-Enable **Svinets** in a world running Foundry VTT v14.
+Для Foundry VTT v12 используйте:
 
-## Generator workflow
+`https://raw.githubusercontent.com/RudySimp/Svinets/foundry-v12/module.json`
 
-Choose a context category and place, set the budget and magic mode, then select **Generate**. Review the GM preview, lock or replace individual lines, regenerate unlocked lines, and publish the approved result to chat.
+## Установка
 
-The v1 generator provides 90 context-aware locations grouped into 16 categories, deterministic seeds, exact budget conservation, bounded coin ranges, high-value valuables, generic magic items, stack-aware quantities, and a clean player-facing chat card.
+В Foundry VTT v12 откройте установку модулей и укажите manifest URL для v12, приведённый выше. Затем включите **Svinets** в мире.
 
-## Compatibility
+## Работа с генератором
 
-Foundry VTT v14.
+Выберите категорию места и само место, задайте бюджет и режим магии, затем нажмите **Сгенерировать**. В GM Preview можно закреплять и заменять строки, перегенерировать незакреплённые строки и публиковать подтверждённый результат в чат.
+
+Генератор включает 90 контекстов в 16 группах, детерминированные seed, точное сохранение бюджета, диапазоны монет, ценные предметы, generic magic, stack policy и отдельную player-facing карточку чата.
+
+## Совместимость
+
+Только Foundry VTT v12 (`minimum: 12`, `verified: 12`, `maximum: 12`).

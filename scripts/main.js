@@ -105,6 +105,6 @@ Hooks.on("getSceneControlButtons", controls => {
   });
 });
 
-Hooks.on("renderChatMessageHTML", (message, html) => bindChatCard(html));
+Hooks.on("renderChatMessage", (message, html) => bindChatCard(html));
 
 export { open, generate, generateMany, state };
